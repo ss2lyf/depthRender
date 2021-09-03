@@ -1,7 +1,6 @@
 
 #include "util.h"
-
-
+#include <open3d/io/TriangleMeshIO.h>
 void project(cv::Vec2d &p0, cv::Vec2d &p1, cv::Vec2d &p2, cv::Mat &depth, Camera &camera, cv::Vec4d &plane) {
 
     double minx = minDouble(p0[0], p1[0]);
@@ -51,44 +50,39 @@ void project(cv::Vec2d &p0, cv::Vec2d &p1, cv::Vec2d &p2, cv::Mat &depth, Camera
 }
 
 
-void triangleToDepth(Camera &camera, cv::Mat &depth, std::vector<::pcl::Vertices> &polygons,
-                     std::vector<pcl::PointXYZ, Eigen::aligned_allocator<pcl::PointXYZ> > &points) {
 
-    const int polygonsNum = polygons.size();
-    std::cout << "polygons number: "<< polygonsNum << std::endl;
 
-    for (int i = 0; i < polygonsNum; i++) {
-        if (polygons[i].vertices.size() != 3) {
+void triangleToDepth(Camera &camera, cv::Mat &depth, open3d::geometry::TriangleMesh &mesh) {
 
-            std::cout << "here " << i << " " << polygons[i].vertices.size() << std::endl;
+    const int triangleNum = mesh.triangles_.size();
+    std::cout << "triangle number: "<< triangleNum << std::endl;
 
-        } else {
+    for (int i = 0; i < triangleNum; i++) {
 
-            cv::Vec3d  points3D[3];
-            cv::Vec2d  points2D[3];
+        cv::Vec3d  points3D[3];
+        cv::Vec2d  points2D[3];
 
-            for(int j=0;j<3;j++){
-                points3D[j][0]=points[polygons[i].vertices[j]].x;
-                points3D[j][1]=points[polygons[i].vertices[j]].y;
-                points3D[j][2]=points[polygons[i].vertices[j]].z;
-                points3D[j] = camera.R * points3D[j];
-                points3D[j] += camera.t;
+        for(int j=0;j<3;j++){
+            points3D[j][0]=mesh.vertices_[mesh.triangles_[i][j]][0];
+            points3D[j][1]=mesh.vertices_[mesh.triangles_[i][j]][1];
+            points3D[j][2]=mesh.vertices_[mesh.triangles_[i][j]][2];
+            points3D[j] = camera.R * points3D[j];
+            points3D[j] += camera.t;
 
-            }
-
-            cv::Vec3d n=(points3D[2] - points3D[0]);
-            n=n.cross((points3D[1] - points3D[0]));
-            n=cv::normalize(n);
-
-            //plane function : Ax+By+Cz=D
-            cv::Vec4d plane(n[0], n[1], n[2], n[0] * points3D[0][0] + n[1] * points3D[0][1] + n[2] * points3D[0][2]);
-
-            for(int j=0;j<3;j++) {
-                points2D[j][0]=points3D[j][0] / points3D[j][2] * camera.fx + camera.cx;
-                points2D[j][1]=points3D[j][1] / points3D[j][2] * camera.fy + camera.cy;
-            }
-            project(points2D[0], points2D[1], points2D[2], depth, camera, plane);
         }
+
+        cv::Vec3d n=(points3D[2] - points3D[0]);
+        n=n.cross((points3D[1] - points3D[0]));
+        n=cv::normalize(n);
+
+        //plane function : Ax+By+Cz=D
+        cv::Vec4d plane(n[0], n[1], n[2], n[0] * points3D[0][0] + n[1] * points3D[0][1] + n[2] * points3D[0][2]);
+
+        for(int j=0;j<3;j++) {
+            points2D[j][0]=points3D[j][0] / points3D[j][2] * camera.fx + camera.cx;
+            points2D[j][1]=points3D[j][1] / points3D[j][2] * camera.fy + camera.cy;
+        }
+        project(points2D[0], points2D[1], points2D[2], depth, camera, plane);
     }
 }
 
@@ -105,33 +99,31 @@ int main(int argc, char* argv[]) {
     std::string cameraFile=argv[2];
     std::string savePath=argv[3];
 
-    pcl::PolygonMesh::Ptr mesh(new pcl::PolygonMesh);
+
     Camera camera;
     readCameraParam(camera,cameraFile);
 
     if(camera.width<=0||camera.height<=0){
         std::cout<<"wrong image size, width: "<<camera.width<<", height: "<<camera.height<<std::endl;
-        exit(-1);
+        exit(2);
     }
 
     cv::Mat depth = cv::Mat::zeros(cv::Size(camera.width, camera.height), CV_64FC1);
 
-    if (pcl::io::loadPLYFile(meshFile, *mesh) == -1) //* load the file
-    {
-        PCL_ERROR ("Couldn't read mesh file  \n");
-        std::cout<<meshFile<<std::endl;
-        return (-1);
-    }
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::fromPCLPointCloud2(mesh->cloud, *cloud);
+    open3d::geometry::TriangleMesh mesh;
+    open3d::io::ReadTriangleMesh(meshFile,mesh);
+    std::cout<<mesh.vertices_[0][0]<<std::endl;
+    std::cout<<mesh.triangles_[0][0]<<std::endl;
 
-    triangleToDepth(camera, depth, mesh->polygons, cloud->points);
+
+    triangleToDepth(camera, depth, mesh);
 
     cv::Mat saveDepth;
 
     depth.convertTo(saveDepth, CV_32FC1);
     writeDepthDmb(savePath+"/depth.dmb", saveDepth,true);
+    genPly(camera,saveDepth,savePath+"/new1656.ply");
 
 
     return 0;
