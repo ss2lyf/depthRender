@@ -90,18 +90,29 @@ void triangleToDepth(Camera &camera, cv::Mat &depth, open3d::geometry::TriangleM
 int main(int argc, char* argv[]) {
 
 
-    if(argc<4){
-        std::cout<<"usage ./depthRender meshFile cameraFile savePath"<<std::endl;
+    if(argc<6){
+        std::cout<<"usage ./depthRender meshFile cameraFile savePath imgWidth imgHeight"<<std::endl;
         exit(-1);
     }
 
     std::string meshFile=argv[1];
     std::string cameraFile=argv[2];
-    std::string savePath=argv[3];
+    std::string saveFile=argv[3];
 
 
     Camera camera;
     readCameraParam(camera,cameraFile);
+    camera.width=std::atoi(argv[4]);
+    camera.height=std::atoi(argv[5]);
+
+    std::cout<<"camera params:"<<std::endl;
+    std::cout<<"R:"<<std::endl;
+    std::cout<<camera.R<<std::endl;
+    std::cout<<"t:"<<std::endl;
+    std::cout<<camera.t.t()<<std::endl;
+    std::cout<<"fx: "<<camera.fx<<", fx: "<<camera.fy<<", cx: "<<camera.cx<<", cy: "<<camera.cy<<std::endl;
+    std::cout<<"width: "<<camera.width<<", height: "<<camera.height<<std::endl;
+
 
     if(camera.width<=0||camera.height<=0){
         std::cout<<"wrong image size, width: "<<camera.width<<", height: "<<camera.height<<std::endl;
@@ -113,17 +124,13 @@ int main(int argc, char* argv[]) {
 
     open3d::geometry::TriangleMesh mesh;
     open3d::io::ReadTriangleMesh(meshFile,mesh);
-    std::cout<<mesh.vertices_[0][0]<<std::endl;
-    std::cout<<mesh.triangles_[0][0]<<std::endl;
-
 
     triangleToDepth(camera, depth, mesh);
 
     cv::Mat saveDepth;
 
     depth.convertTo(saveDepth, CV_32FC1);
-    writeDepthDmb(savePath+"/depth.dmb", saveDepth,true);
-    genPly(camera,saveDepth,savePath+"/new1656.ply");
+    writeDepthDmb(saveFile, saveDepth,true);
 
 
     return 0;

@@ -59,6 +59,13 @@ void depth2color(cv::Mat &color, const cv::Mat &depth, const double max, const d
                       cv::COLORMAP_JET);// this is great. It converts your grayscale image into a tone-mapped one, much more pleasing for the eye function is found in contrib module, so include contrib.hpp  and link accordingly
 }
 
+bool isContainEach(std::string a,std::string b){
+
+    return (std::strstr(a.c_str(),b.c_str())!=NULL)||
+            (std::strstr(b.c_str(),a.c_str())!=NULL);
+
+}
+
 
 void readCameraParam(Camera &camera, std::string cameraFile) {
 
@@ -70,9 +77,15 @@ void readCameraParam(Camera &camera, std::string cameraFile) {
     }
 
     std::string temp = "";
-    while (temp != "extrinsic") {
+
+    std::string templateStr ="extrinsic";
+
+    while(!isContainEach(templateStr,temp)||temp.empty()){
         std::getline(camFile, temp);
+        std::cout<<temp<<std::endl;
+        //exit(0);
     }
+
 
     for (int row = 0; row < 3; row++) {
 
@@ -90,9 +103,13 @@ void readCameraParam(Camera &camera, std::string cameraFile) {
 
     }
 
-    while (temp != "intrinsic") {
+
+    templateStr ="intrinsic";
+
+    while(!isContainEach(templateStr,temp)||temp.empty()){
         std::getline(camFile, temp);
     }
+
 
     cv::Matx33d K;
 
@@ -113,21 +130,6 @@ void readCameraParam(Camera &camera, std::string cameraFile) {
     camera.fy = K(1, 1);
     camera.cx = K(0, 2);
     camera.cy = K(1, 2);
-
-    while (temp != "width") {
-        std::getline(camFile, temp);
-    }
-
-    std::getline(camFile, temp);
-    camera.width = std::atof(temp.c_str());
-
-
-    while (temp != "height") {
-        std::getline(camFile, temp);
-    }
-
-    std::getline(camFile, temp);
-    camera.height = std::atof(temp.c_str());
 
     camFile.close();
 
